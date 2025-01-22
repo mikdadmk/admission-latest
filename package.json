@@ -1,0 +1,40 @@
+{
+  "name": "dawa-academy",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@fontsource/anek-malayalam": "^5.1.1",
+    "@fontsource/poppins": "^5.1.1",
+    "@fortawesome/free-brands-svg-icons": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^0.2.2",
+    "@heroicons/react": "^2.2.0",
+    "archiver": "^7.0.1",
+    "firebase": "^11.3.1",
+    "firebase-admin": "^13.0.2",
+    "framer-motion": "^12.4.2",
+    "lucide-react": "^0.475.0",
+    "mongodb": "^6.13.0",
+    "mongoose": "^8.10.0",
+    "next": "15.1.7",
+    "next-auth": "^4.24.11",
+    "pdf-lib": "^1.17.1",
+    "pdfkit": "^0.16.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9",
+    "eslint-config-next": "15.1.7",
+    "postcss": "^8.5.2",
+    "tailwindcss": "^3.4.17"
+  }
+}
