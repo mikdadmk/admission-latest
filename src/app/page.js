@@ -59,7 +59,7 @@ const Navbar = () => {
               />
             </div>
             <span className="text-xl font-bold text-white font-['Poppins'] tracking-wide">
-              Islamic Dawa Academy
+              Islamic Dawa Academy Akode
             </span>
           </Link>
 
