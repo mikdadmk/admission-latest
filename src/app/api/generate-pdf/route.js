@@ -52,23 +52,27 @@ export async function GET(request) {
         });
 
         // ✅ Profile Photo (Only Pupil's Photo)
-        let profileImage;
-        if (user.files?.pupilPhoto) {
-            try {
-                const photoPath = path.join(process.cwd(), "public", user.files.pupilPhoto);
-                const photoBytes = await fs.readFile(photoPath);
-                profileImage = await pdfDoc.embedJpg(photoBytes).catch(() => pdfDoc.embedPng(photoBytes));
+      // Profile Photo (Only Pupil's Photo)
+let profileImage;
+if (user.files?.pupilPhoto) {
+  try {
+    // Use the file path stored in the database directly
+    const photoPath = user.files.pupilPhoto;
+    const photoBytes = await fs.readFile(photoPath);
+    profileImage = await pdfDoc.embedJpg(photoBytes).catch(() =>
+      pdfDoc.embedPng(photoBytes)
+    );
 
-                page.drawImage(profileImage, {
-                    x: 450,
-                    y: 700,
-                    width: 100,
-                    height: 100,
-                });
-            } catch (error) {
-                console.warn("⚠️ Error embedding profile photo:", error);
-            }
-        }
+    page.drawImage(profileImage, {
+      x: 450,
+      y: 700,
+      width: 100,
+      height: 100,
+    });
+  } catch (error) {
+    console.warn("⚠️ Error embedding profile photo:", error);
+  }
+}
 
         // ✅ Add User Information
         let yPosition = 750;
