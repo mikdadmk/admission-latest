@@ -274,44 +274,55 @@ export async function POST(request) {
             }
         }
 
-        // ✅ Connect to MongoDB
-        const client = await clientPromise;
-        const db = client.db("admission_management");
+        // ✅ Return Response Immediately (Prevents Timeout)
+        const response = NextResponse.json({ message: "✅ Admission submitted, processing in background" }, { status: 202 });
 
-        // ✅ Assign Role
-        const userCount = await db.collection("users").countDocuments();
-        let role = userCount === 0 ? "admin" : userCount === 1 ? "subadmin" : "user";
+        // ✅ Background Processing to Store Data in MongoDB & Firebase
+        (async () => {
+            try {
+                // ✅ Connect to MongoDB
+                const client = await clientPromise;
+                const db = client.db("admission_management");
 
-        // ✅ Ensure Firebase Authentication Completes Before Returning
-        let user;
-        try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            user = userCredential.user;
-            console.log("✅ Firebase User Created:", user.uid);
-        } catch (firebaseError) {
-            console.error("❌ Firebase Authentication Failed:", firebaseError);
-            return NextResponse.json({ error: firebaseError.message }, { status: 500 });
-        }
+                // ✅ Assign Role (First User → Admin, Second → Subadmin, Others → User)
+                const userCount = await db.collection("users").countDocuments();
+                let role = userCount === 0 ? "admin" : userCount === 1 ? "subadmin" : "user";
 
-        // ✅ Store Data in MongoDB
-        await db.collection("admissions").insertOne({
-            uid: user.uid,
-            name, fatherName, motherName, guardianName, relation,
-            address, dob, phone, whatsapp, email,
-            files: filePaths,
-            createdAt: new Date()
-        });
+                // ✅ Create Firebase User
+                let user;
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    user = userCredential.user;
+                    console.log("✅ Firebase User Created:", user.uid);
+                } catch (firebaseError) {
+                    console.error("❌ Firebase Authentication Failed:", firebaseError);
+                    return;
+                }
 
-        await db.collection("users").insertOne({
-            uid: user.uid,
-            name, email, phone, role,
-            files: filePaths,
-            createdAt: new Date()
-        });
+                // ✅ Store Admission Data in MongoDB
+                await db.collection("admissions").insertOne({
+                    uid: user.uid,
+                    name, fatherName, motherName, guardianName, relation,
+                    address, dob, phone, whatsapp, email,
+                    files: filePaths,
+                    createdAt: new Date()
+                });
 
-        console.log("✅ Admission and user registration stored successfully.");
+                // ✅ Store User Data in MongoDB
+                await db.collection("users").insertOne({
+                    uid: user.uid,
+                    name, email, phone, role,
+                    files: filePaths,
+                    createdAt: new Date()
+                });
 
-        return NextResponse.json({ message: "✅ Admission and user registration successful", role }, { status: 201 });
+                console.log("✅ Admission and user registration stored successfully.");
+            } catch (error) {
+                console.error("❌ Error Processing Admission in Background:", error);
+            }
+        })();
+
+        return response;
 
     } catch (error) {
         console.error("❌ Error Processing Admission:", error);
