@@ -266,7 +266,7 @@ export async function POST(request) {
         // ✅ Return Response Before Uploading to Prevent Timeout
         const response = NextResponse.json({ message: "✅ Admission submitted, processing in background" }, { status: 202 });
 
-        // ✅ Run File Upload, Firebase & MongoDB Operations in Background
+        // ✅ Run Upload, Firebase, and MongoDB Operations in Background
         (async () => {
             try {
                 // ✅ Setup WebDAV Client
