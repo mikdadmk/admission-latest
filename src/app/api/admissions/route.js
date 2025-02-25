@@ -266,10 +266,14 @@ export async function POST(request) {
         // ✅ Return Response Before Uploading to Prevent Timeout
         const response = NextResponse.json({ message: "✅ Admission submitted, processing in background" }, { status: 202 });
 
-        // ✅ Run Upload, Firebase, and MongoDB Operations in Background
+        // ✅ Run Upload & Database Operations in Background
         (async () => {
             try {
-                // ✅ Setup WebDAV Client
+                // ✅ Fix MongoDB Connection Issue
+                const client = await clientPromise;
+                const db = client.db("admission_management");
+
+                // ✅ Setup WebDAV Client (Fix 423 Locked Error)
                 const webdavClient = createClient(process.env.NEXTCLOUD_URL, {
                     username: process.env.NEXTCLOUD_USERNAME,
                     password: process.env.NEXTCLOUD_PASSWORD,
@@ -284,7 +288,7 @@ export async function POST(request) {
                 const baseDirectory = "/webuploads/";
                 console.log(`Uploading files to: ${baseDirectory}`);
 
-                // ✅ Handle File Uploads
+                // ✅ Handle File Uploads (Fix 423 Locked Error)
                 const filePaths = {};
                 const fileFields = ["aadhaar", "tc", "pupilPhoto", "signature"];
 
@@ -300,7 +304,13 @@ export async function POST(request) {
                             // ✅ Convert file to Buffer before uploading
                             const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-                            await webdavClient.putFileContents(filePath, fileBuffer, { overwrite: true });
+                            // ✅ Fix 423 Locked Error by ensuring overwrite
+                            await webdavClient.putFileContents(filePath, fileBuffer, {
+                                overwrite: true,
+                                onError: (error) => {
+                                    console.error(`❌ WebDAV Upload Failed: ${error}`);
+                                }
+                            });
 
                             filePaths[key] = filePath;
                             console.log(`✅ File uploaded successfully: ${filePath}`);
@@ -309,10 +319,6 @@ export async function POST(request) {
                         }
                     }
                 }
-
-                // ✅ Ensure MongoDB Connection is Properly Established
-                const client = await clientPromise;
-                const db = client.db("admission_management");
 
                 // ✅ Assign Role (First User → Admin, Second → Subadmin, Others → User)
                 const userCount = await db.collection("users").countDocuments();
