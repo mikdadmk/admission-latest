@@ -30,7 +30,6 @@ if (!global._mongoClientPromise) {
     client = new MongoClient(uri, {
         serverSelectionTimeoutMS: 30000, // ✅ Prevents MongoDB timeout
         connectTimeoutMS: 30000, // ✅ Prevents connection timeout
-        tls: true, // ✅ Ensures MongoDB uses TLS/SSL
         directConnection: true, // ✅ Fixes Vercel connection issues
     });
 
