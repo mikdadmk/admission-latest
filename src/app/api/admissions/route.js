@@ -266,8 +266,8 @@ export async function POST(request) {
         // ✅ Return Response Before Uploading to Prevent Timeout
         const response = NextResponse.json({ message: "✅ Admission submitted, processing in background" }, { status: 202 });
 
-        // ✅ Background Processing with Timeout Fix
-        setTimeout(async () => {
+        // ✅ Run File Upload, Firebase & MongoDB Operations in Background
+        (async () => {
             try {
                 // ✅ Setup WebDAV Client
                 const webdavClient = createClient(process.env.NEXTCLOUD_URL, {
@@ -310,7 +310,7 @@ export async function POST(request) {
                     }
                 }
 
-                // ✅ Connect to MongoDB inside Background Process
+                // ✅ Ensure MongoDB Connection is Properly Established
                 const client = await clientPromise;
                 const db = client.db("admission_management");
 
@@ -318,14 +318,14 @@ export async function POST(request) {
                 const userCount = await db.collection("users").countDocuments();
                 let role = userCount === 0 ? "admin" : userCount === 1 ? "subadmin" : "user";
 
-                // ✅ Create User in Firebase Authentication
+                // ✅ Ensure Firebase Authentication Completes
                 let user;
                 try {
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                     user = userCredential.user;
                     console.log("✅ Firebase User Created:", user.uid);
                 } catch (firebaseError) {
-                    console.error("❌ Error during Firebase Authentication:", firebaseError);
+                    console.error("❌ Firebase Authentication Failed:", firebaseError);
                     return;
                 }
 
@@ -350,7 +350,7 @@ export async function POST(request) {
             } catch (error) {
                 console.error("❌ Error Processing Admission in Background:", error);
             }
-        }, 2000); // **Delay execution to prevent Vercel from killing the function early**
+        })();
 
         return response;
 
