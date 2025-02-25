@@ -223,6 +223,115 @@
 
 
 
+// import { NextResponse } from "next/server";
+// import { createClient } from "webdav";
+// import clientPromise from "@/lib/mongodb";
+// import { auth, createUserWithEmailAndPassword } from "@/lib/firebase";
+
+// export async function POST(request) {
+//     try {
+//         const formData = await request.formData();
+//         console.log("📤 Received Admission Data");
+
+//         // ✅ Convert FormData to JSON
+//         const extractedData = {};
+//         for (const [key, value] of formData.entries()) {
+//             extractedData[key] = value;
+//         }
+
+//         const { name, fatherName, motherName, guardianName, relation, address, dob, phone, whatsapp, email, password } = extractedData;
+
+//         if (!name || !fatherName || !motherName || !guardianName || !relation || !address || !dob || !phone || !whatsapp || !email || !password) {
+//             return NextResponse.json({ error: "❌ Missing required fields" }, { status: 400 });
+//         }
+
+//         // ✅ WebDAV Client for File Uploads
+//         const webdavClient = createClient(process.env.NEXTCLOUD_URL, {
+//             username: process.env.NEXTCLOUD_USERNAME,
+//             password: process.env.NEXTCLOUD_PASSWORD,
+//         });
+
+//         // ✅ Handle File Uploads
+//         const filePaths = {};
+//         const fileFields = ["aadhaar", "tc", "pupilPhoto", "signature"];
+
+//         for (const key of fileFields) {
+//             const file = formData.get(key);
+//             if (file && file.name) {
+//                 const filePath = `/webuploads/${encodeURIComponent(file.name)}`;
+//                 console.log(`Uploading to: ${filePath}`);
+
+//                 try {
+//                     const fileBuffer = Buffer.from(await file.arrayBuffer());
+//                     await webdavClient.putFileContents(filePath, fileBuffer, { overwrite: true });
+
+//                     filePaths[key] = filePath;
+//                     console.log(`✅ File uploaded successfully: ${filePath}`);
+//                 } catch (uploadError) {
+//                     console.error("❌ Failed to upload file:", uploadError);
+//                     return NextResponse.json({ error: "❌ File upload failed", details: uploadError.message }, { status: 401 });
+//                 }
+//             }
+//         }
+
+//         // ✅ Return Response Immediately (Prevents Timeout)
+//         const response = NextResponse.json({ message: "✅ Admission submitted, processing in background" }, { status: 202 });
+
+//         // ✅ Background Processing to Store Data in MongoDB & Firebase
+//         (async () => {
+//             try {
+//                 // ✅ Connect to MongoDB
+//                 const client = await clientPromise;
+//                 const db = client.db("admission_management");
+
+//                 // ✅ Assign Role (First User → Admin, Second → Subadmin, Others → User)
+//                 const userCount = await db.collection("users").countDocuments();
+//                 let role = userCount === 0 ? "admin" : userCount === 1 ? "subadmin" : "user";
+
+//                 // ✅ Create Firebase User
+//                 let user;
+//                 try {
+//                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+//                     user = userCredential.user;
+//                     console.log("✅ Firebase User Created:", user.uid);
+//                 } catch (firebaseError) {
+//                     console.error("❌ Firebase Authentication Failed:", firebaseError);
+//                     return;
+//                 }
+
+//                 // ✅ Store Admission Data in MongoDB
+//                 await db.collection("admissions").insertOne({
+//                     uid: user.uid,
+//                     name, fatherName, motherName, guardianName, relation,
+//                     address, dob, phone, whatsapp, email,
+//                     files: filePaths,
+//                     createdAt: new Date()
+//                 });
+
+//                 // ✅ Store User Data in MongoDB
+//                 await db.collection("users").insertOne({
+//                     uid: user.uid,
+//                     name, email, phone, role,
+//                     files: filePaths,
+//                     createdAt: new Date()
+//                 });
+
+//                 console.log("✅ Admission and user registration stored successfully.");
+//             } catch (error) {
+//                 console.error("❌ Error Processing Admission in Background:", error);
+//             }
+//         })();
+
+//         return response;
+
+//     } catch (error) {
+//         console.error("❌ Error Processing Admission:", error);
+//         return NextResponse.json({ error: "❌ Internal server error", details: error.message }, { status: 500 });
+//     }
+// }
+
+
+
 import { NextResponse } from "next/server";
 import { createClient } from "webdav";
 import clientPromise from "@/lib/mongodb";
@@ -274,55 +383,44 @@ export async function POST(request) {
             }
         }
 
-        // ✅ Return Response Immediately (Prevents Timeout)
-        const response = NextResponse.json({ message: "✅ Admission submitted, processing in background" }, { status: 202 });
+        // ✅ Connect to MongoDB
+        const client = await clientPromise;
+        const db = client.db("admission_management");
 
-        // ✅ Background Processing to Store Data in MongoDB & Firebase
-        (async () => {
-            try {
-                // ✅ Connect to MongoDB
-                const client = await clientPromise;
-                const db = client.db("admission_management");
+        // ✅ Assign Role
+        const userCount = await db.collection("users").countDocuments();
+        let role = userCount === 0 ? "admin" : userCount === 1 ? "subadmin" : "user";
 
-                // ✅ Assign Role (First User → Admin, Second → Subadmin, Others → User)
-                const userCount = await db.collection("users").countDocuments();
-                let role = userCount === 0 ? "admin" : userCount === 1 ? "subadmin" : "user";
+        // ✅ Ensure Firebase Authentication Completes Before Returning
+        let user;
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            user = userCredential.user;
+            console.log("✅ Firebase User Created:", user.uid);
+        } catch (firebaseError) {
+            console.error("❌ Firebase Authentication Failed:", firebaseError);
+            return NextResponse.json({ error: firebaseError.message }, { status: 500 });
+        }
 
-                // ✅ Create Firebase User
-                let user;
-                try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    user = userCredential.user;
-                    console.log("✅ Firebase User Created:", user.uid);
-                } catch (firebaseError) {
-                    console.error("❌ Firebase Authentication Failed:", firebaseError);
-                    return;
-                }
+        // ✅ Store Data in MongoDB
+        await db.collection("admissions").insertOne({
+            uid: user.uid,
+            name, fatherName, motherName, guardianName, relation,
+            address, dob, phone, whatsapp, email,
+            files: filePaths,
+            createdAt: new Date()
+        });
 
-                // ✅ Store Admission Data in MongoDB
-                await db.collection("admissions").insertOne({
-                    uid: user.uid,
-                    name, fatherName, motherName, guardianName, relation,
-                    address, dob, phone, whatsapp, email,
-                    files: filePaths,
-                    createdAt: new Date()
-                });
+        await db.collection("users").insertOne({
+            uid: user.uid,
+            name, email, phone, role,
+            files: filePaths,
+            createdAt: new Date()
+        });
 
-                // ✅ Store User Data in MongoDB
-                await db.collection("users").insertOne({
-                    uid: user.uid,
-                    name, email, phone, role,
-                    files: filePaths,
-                    createdAt: new Date()
-                });
+        console.log("✅ Admission and user registration stored successfully.");
 
-                console.log("✅ Admission and user registration stored successfully.");
-            } catch (error) {
-                console.error("❌ Error Processing Admission in Background:", error);
-            }
-        })();
-
-        return response;
+        return NextResponse.json({ message: "✅ Admission and user registration successful", role }, { status: 201 });
 
     } catch (error) {
         console.error("❌ Error Processing Admission:", error);
