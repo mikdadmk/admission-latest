@@ -26,10 +26,12 @@
     "mongoose": "^8.10.0",
     "next": "15.1.7",
     "next-auth": "^4.24.11",
+    "node-fetch": "^3.3.2",
     "pdf-lib": "^1.17.1",
     "pdfkit": "^0.16.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "webdav": "^5.8.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
