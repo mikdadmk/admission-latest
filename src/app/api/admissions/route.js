@@ -111,6 +111,118 @@
 // }
 
 
+// import { NextResponse } from "next/server";
+// import { createClient } from "webdav";
+// import clientPromise from "@/lib/mongodb";
+// import { auth, createUserWithEmailAndPassword } from "@/lib/firebase";
+
+// export async function POST(request) {
+//     try {
+//         const formData = await request.formData();
+//         console.log("📤 Received Admission Data");
+
+//         // ✅ Convert FormData to JSON
+//         const extractedData = {};
+//         for (const [key, value] of formData.entries()) {
+//             extractedData[key] = value;
+//         }
+
+//         const { name, fatherName, motherName, guardianName, relation, address, dob, phone, whatsapp, email, password } = extractedData;
+
+//         if (!name || !fatherName || !motherName || !guardianName || !relation || !address || !dob || !phone || !whatsapp || !email || !password) {
+//             return NextResponse.json({ error: "❌ Missing required fields" }, { status: 400 });
+//         }
+
+//         // ✅ Setup WebDAV Client (For File Uploads)
+//         const webdavClient = createClient(process.env.NEXTCLOUD_URL, {
+//             username: process.env.NEXTCLOUD_USERNAME,
+//             password: process.env.NEXTCLOUD_PASSWORD,
+//             headers: {
+//                 "Authorization": `Basic ${Buffer.from(
+//                     `${process.env.NEXTCLOUD_USERNAME}:${process.env.NEXTCLOUD_PASSWORD}`
+//                 ).toString("base64")}`
+//             }
+//         });
+
+//         // ✅ Upload Directory
+//         const baseDirectory = "/webuploads/";
+//         console.log(`Uploading files to: ${baseDirectory}`);
+
+//         // ✅ Handle File Uploads
+//         const filePaths = {};
+//         const fileFields = ["aadhaar", "tc", "pupilPhoto", "signature"];
+
+//         for (const key of fileFields) {
+//             const file = formData.get(key);
+//             if (file && file.name) {
+//                 const encodedFileName = encodeURIComponent(file.name);
+//                 const filePath = `${baseDirectory}${encodedFileName}`;
+
+//                 console.log(`Uploading to: ${filePath}`);
+
+//                 try {
+//                     // ✅ Convert file to Buffer before uploading
+//                     const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+//                     await webdavClient.putFileContents(filePath, fileBuffer, { overwrite: true });
+
+//                     filePaths[key] = filePath;
+//                     console.log(`✅ File uploaded successfully: ${filePath}`);
+//                 } catch (uploadError) {
+//                     console.error("❌ Failed to upload file:", uploadError);
+//                     return NextResponse.json({ error: "❌ File upload failed", details: uploadError.message }, { status: 401 });
+//                 }
+//             }
+//         }
+
+//         // ✅ Connect to MongoDB
+//         const client = await clientPromise;
+//         const db = client.db("admission_management");
+
+//         // ✅ Assign Role (First User → Admin, Second → Subadmin, Others → User)
+//         const userCount = await db.collection("users").countDocuments();
+//         let role = userCount === 0 ? "admin" : userCount === 1 ? "subadmin" : "user";
+
+//         // ✅ Ensure Firebase Authentication Completes Before Returning Response
+//         let user;
+//         try {
+//             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+//             user = userCredential.user;
+//             console.log("✅ Firebase User Created:", user.uid);
+//         } catch (firebaseError) {
+//             console.error("❌ Firebase Authentication Failed:", firebaseError);
+//             return NextResponse.json({ error: firebaseError.message }, { status: 500 });
+//         }
+
+//         // ✅ Store Admission Data in MongoDB
+//         await db.collection("admissions").insertOne({
+//             uid: user.uid,
+//             name, fatherName, motherName, guardianName, relation,
+//             address, dob, phone, whatsapp, email,
+//             files: filePaths,
+//             createdAt: new Date()
+//         });
+
+//         // ✅ Store User Data in MongoDB
+//         await db.collection("users").insertOne({
+//             uid: user.uid,
+//             name, email, phone, role,
+//             files: filePaths,
+//             createdAt: new Date()
+//         });
+
+//         console.log("✅ Admission and user registration stored successfully.");
+
+//         return NextResponse.json({ message: "✅ Admission and user registration successful", role }, { status: 201 });
+
+//     } catch (error) {
+//         console.error("❌ Error Processing Admission:", error);
+//         return NextResponse.json({ error: "❌ Internal server error", details: error.message }, { status: 500 });
+//     }
+// }
+
+
+
 import { NextResponse } from "next/server";
 import { createClient } from "webdav";
 import clientPromise from "@/lib/mongodb";
@@ -133,20 +245,11 @@ export async function POST(request) {
             return NextResponse.json({ error: "❌ Missing required fields" }, { status: 400 });
         }
 
-        // ✅ Setup WebDAV Client (For File Uploads)
+        // ✅ WebDAV Client for File Uploads
         const webdavClient = createClient(process.env.NEXTCLOUD_URL, {
             username: process.env.NEXTCLOUD_USERNAME,
             password: process.env.NEXTCLOUD_PASSWORD,
-            headers: {
-                "Authorization": `Basic ${Buffer.from(
-                    `${process.env.NEXTCLOUD_USERNAME}:${process.env.NEXTCLOUD_PASSWORD}`
-                ).toString("base64")}`
-            }
         });
-
-        // ✅ Upload Directory
-        const baseDirectory = "/webuploads/";
-        console.log(`Uploading files to: ${baseDirectory}`);
 
         // ✅ Handle File Uploads
         const filePaths = {};
@@ -155,15 +258,11 @@ export async function POST(request) {
         for (const key of fileFields) {
             const file = formData.get(key);
             if (file && file.name) {
-                const encodedFileName = encodeURIComponent(file.name);
-                const filePath = `${baseDirectory}${encodedFileName}`;
-
+                const filePath = `/webuploads/${encodeURIComponent(file.name)}`;
                 console.log(`Uploading to: ${filePath}`);
 
                 try {
-                    // ✅ Convert file to Buffer before uploading
                     const fileBuffer = Buffer.from(await file.arrayBuffer());
-
                     await webdavClient.putFileContents(filePath, fileBuffer, { overwrite: true });
 
                     filePaths[key] = filePath;
@@ -179,11 +278,11 @@ export async function POST(request) {
         const client = await clientPromise;
         const db = client.db("admission_management");
 
-        // ✅ Assign Role (First User → Admin, Second → Subadmin, Others → User)
+        // ✅ Assign Role
         const userCount = await db.collection("users").countDocuments();
         let role = userCount === 0 ? "admin" : userCount === 1 ? "subadmin" : "user";
 
-        // ✅ Ensure Firebase Authentication Completes Before Returning Response
+        // ✅ Ensure Firebase Authentication Completes Before Returning
         let user;
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -194,7 +293,7 @@ export async function POST(request) {
             return NextResponse.json({ error: firebaseError.message }, { status: 500 });
         }
 
-        // ✅ Store Admission Data in MongoDB
+        // ✅ Store Data in MongoDB
         await db.collection("admissions").insertOne({
             uid: user.uid,
             name, fatherName, motherName, guardianName, relation,
@@ -203,7 +302,6 @@ export async function POST(request) {
             createdAt: new Date()
         });
 
-        // ✅ Store User Data in MongoDB
         await db.collection("users").insertOne({
             uid: user.uid,
             name, email, phone, role,
@@ -220,6 +318,3 @@ export async function POST(request) {
         return NextResponse.json({ error: "❌ Internal server error", details: error.message }, { status: 500 });
     }
 }
-
-
-
